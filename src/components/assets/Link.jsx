@@ -10,21 +10,22 @@ class LinkComponent extends React.Component {
     }
   }
   componentDidMount = () => {
-    this.exit();
+    this.enter();
   }
-  componentWillUnmount = () => {
+  componentWillLeave = (callback) => {
     this.exit();
   }
   enter = () => {
     this.d3Node = this.d3Node || d3.select(ReactDOM.findDOMNode(this));
     this.d3Node.datum(this.props.link).attr('d', link => {
-      return this.diagonal({source: link.source, target: link.source})
+      return this.diagonal({source: link.source.source, target: link.source.source})
     }).transition().duration(this.props.duration).attr('d', this.diagonal(this.props.link));
   }
   exit = () => {
     this.d3Node = this.d3Node || d3.select(ReactDOM.findDOMNode(this));
     this.d3Node.datum(this.props.link).transition().duration(this.props.duration).attr('d', link => {
-      return this.diagonal({source: link.target, target: link.source});
+      console.log(link.source.source)
+      return this.diagonal({source: link.source.source, target: link.source.source});
     });
   }
   diagonal = d3.svg.diagonal().projection(node => {

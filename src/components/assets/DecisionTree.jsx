@@ -8,7 +8,7 @@ import DecisionNode from './DecisionNode.jsx';
 import Link from './Link.jsx';
 
 import dataFile from 'json!./data.json';
-
+let i = 0;
 class DecisionTreeComponent extends React.Component {
   constructor(props) {
     super(props);
@@ -16,24 +16,25 @@ class DecisionTreeComponent extends React.Component {
       duration: props.duration, //TODO: Remove from state if not being changed
       height: props.height,
       width: props.width,
-      root: dataFile // TODO: Replace this with XHRreq func
+      root: dataFile, // TODO: Replace this with XHRreq func
+      tree: d3.layout.tree().size([props.height, props.width])
     };
-    // this.state.root.x = this.state.height / 2;
-    // this.state.root.y = 0;
   }
   componentWillMount = () => {
-    const margin = {
-      top: 20,
-      right: 40,
-      bottom: 20,
-      left: 40
-    };
-    const height = this.state.height - margin.top - margin.bottom;
-    const width = this.state.width - margin.right - margin.left;
-    let tree = d3.layout.tree().size([this.state.height, this.state.width]);
-    let nodes = tree.nodes(this.state.root);
-    let links = tree.links(nodes);
-    this.setState({tree: tree, nodes: nodes, links: links});
+    this.state.root.x0 = this.state.height /2;
+    this.state.root.y0 = 0;
+    this.updateTree();
+    // const margin = {
+    //   top: 20,
+    //   right: 40,
+    //   bottom: 20,
+    //   left: 40
+    // };
+    // const height = this.state.height - margin.top - margin.bottom;
+    // const width = this.state.width - margin.right - margin.left;
+    // let tree = d3.layout.tree().size([this.state.height, this.state.width]);
+    // this.setState({tree: tree}, this.updateTree);
+
   }
   componentDidMount = () => {
     d3.select(ReactDOM.findDOMNode(this)).attr('width', this.state.width).attr('height', this.state.height)
@@ -43,37 +44,47 @@ class DecisionTreeComponent extends React.Component {
     })
     d3.select(this.refs.container).call(zoom)
   }
-  updateTree = (node) => {
-    console.log(node);
+  updateTree = () => {
     let nodes = this.state.tree.nodes(this.state.root).reverse();
+    // Spread out nodes evently.
+    let maxDepth = -1;
+    nodes.forEach(node => {
+      if (node.depth > maxDepth - 1) maxDepth = node.depth + 1;
+    })
+    nodes.forEach(node => {
+      node.y = node.depth * (this.state.width / maxDepth);
+    });
+    nodes.forEach(node => {
+      node.source = node.source || this.state.root;
+    })
     let links = this.state.tree.links(nodes);
-    // Normalize for fixed-depth.
-    nodes.forEach(function(d) {
-      d.y = d.depth * 180;
+    // console.log(this.state);
+    this.setState({nodes: nodes, links: links}, () => {
+      // console.log(this.state);
     });
 
-    let svg = d3.select(ReactDOM.findDOMNode(this)).select('svg');
-    let id = 0;
+    // let svg = d3.select(ReactDOM.findDOMNode(this)).select('svg');
+    // let id = 0;
 
     //Find all entering nodes
-    let updatedNodes = svg.selectAll('g.node').data(nodes, n => {
-      return n.id || (n.id = id++);
-    });
-
+    // console.log(updatedNodes);
+    // let enteringNodes = [];
+    // updatedNodes.enter()[0].update.forEach(node => {
+    //   enteringNodes.push(node.__data__);
+    // });
     //Find all entering links
-    let updatedLinks = svg.selectAll('path.link').data(links, l => {
-      console.log(l)
-      return l.target.id;
-    });
-
-    console.log(this.state);
-    this.setState({nodes: updatedNodes.enter()[0], links: updatedLinks.enter()[0]}, () => {
-      console.log(this.state);
-    });
+    // let updatedLinks = svg.selectAll('path.link').data(links, l => {
+    //   return l.target.id;
+    // });
+    // let enteringLinks = [];
+    // updatedLinks.enter()[0].update.forEach(link => {
+    //   enteringLinks.push(link.__data__);
+    // });
   }
-  toggleCollapse = (node) => {
+  toggleCollapse = node => {
     console.log(node)
     if (node.children) {
+      this.setSource(node, node)
       // Collapse all children, and their children
       node._children = node.children;
       // node.children.forEach(this.toggleCollapse); //TODO: create sub-function to toggle collapse of children
@@ -82,7 +93,12 @@ class DecisionTreeComponent extends React.Component {
       node.children = node._children;
       node._children = null;
     }
-    this.updateTree(node);
+    this.updateTree();
+  }
+  setSource = (node, source) => {
+    if (node.children)
+      node.children.forEach(n => this.setSource(n, source));
+    node.source = source;
   }
   render() {
     const margin = {
@@ -115,6 +131,7 @@ class DecisionTreeComponent extends React.Component {
         strokeWidth: '1.5px'
       }
     };
+    console.log(this.state)
     return (
       <Paper style={styles.wrapper}>
         <svg style={styles.tree}>
