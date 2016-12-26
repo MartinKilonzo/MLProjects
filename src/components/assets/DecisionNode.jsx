@@ -34,6 +34,7 @@ class DecisionNodeComponenent extends React.Component {
   exit = () => {
     this.d3Node = d3.select(ReactDOM.findDOMNode(this));
     this.d3Node.datum(this.props.node).transition().duration(this.props.duration).attr('transform', node => {
+      console.log(node)
       if (typeof node.parent == 'undefined') {
         console.log('no parent exit', node)
         return `translate(${node.y}, ${node.x})`;

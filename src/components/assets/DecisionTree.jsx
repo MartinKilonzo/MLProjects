@@ -1,6 +1,5 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
-import update from 'immutability-helper';
 import Paper from 'material-ui/Paper';
 import d3 from 'd3';
 
@@ -45,7 +44,7 @@ class DecisionTreeComponent extends React.Component {
     d3.select(this.refs.container).call(zoom)
   }
   updateTree = () => {
-    let nodes = this.state.tree.nodes(this.state.root).reverse();
+    let nodes = this.state.tree.nodes(this.state.root);
     // Spread out nodes evently.
     let maxDepth = -1;
     nodes.forEach(node => {
@@ -59,30 +58,15 @@ class DecisionTreeComponent extends React.Component {
     })
     let links = this.state.tree.links(nodes);
     // console.log(this.state);
+
+
     this.setState({nodes: nodes, links: links}, () => {
       // console.log(this.state);
     });
-
-    // let svg = d3.select(ReactDOM.findDOMNode(this)).select('svg');
-    // let id = 0;
-
-    //Find all entering nodes
-    // console.log(updatedNodes);
-    // let enteringNodes = [];
-    // updatedNodes.enter()[0].update.forEach(node => {
-    //   enteringNodes.push(node.__data__);
-    // });
-    //Find all entering links
-    // let updatedLinks = svg.selectAll('path.link').data(links, l => {
-    //   return l.target.id;
-    // });
-    // let enteringLinks = [];
-    // updatedLinks.enter()[0].update.forEach(link => {
-    //   enteringLinks.push(link.__data__);
-    // });
   }
   toggleCollapse = node => {
-    console.log(node)
+    console.log('Toggle', node)
+    console.log(node.children || node._children)
     if (node.children) {
       this.setSource(node, node)
       // Collapse all children, and their children
