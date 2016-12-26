@@ -107,7 +107,7 @@ class DecisionTreeComponent extends React.Component {
 
     // Transition exiting nodes to the parent's new position.
     let nodeExit = svgNodes.exit().transition().duration(this.state.duration).attr('transform', (node) => {
-      return `translate(${source.y0},${source.x0})`;
+      return `translate(${source.y},${source.x})`;
     }).remove();
 
     nodeExit.select('circle').attr('r', 1e-6);
@@ -116,14 +116,16 @@ class DecisionTreeComponent extends React.Component {
   }
   updateLinks = (links, source) => {
     // Update the links…
-    let svgLinks = this.state.svg.selectAll('path.link').data(links);
+    let svgLinks = this.state.svg.selectAll('path.link').data(links, link => {
+      return link.target.id;
+    });
 
     // Enter any new links at the parent's previous position.
     svgLinks.enter().insert('path', 'g').attr('class', 'link').attr('d', (link) => {
-      console.debug('enter', link)
+      console.debug('enter', link, source)
       let node = {
-        x: source.x,
-        y: source.y
+        x: source.x0,
+        y: source.y0
       };
       return this.diagonal({source: node, target: node});
     });
@@ -133,10 +135,10 @@ class DecisionTreeComponent extends React.Component {
 
     // Transition exiting nodes to the parent's new position.
     svgLinks.exit().transition().duration(this.state.duration).attr('d', (link) => {
-      console.debug('exit', link)
+      console.debug('exit', link, source)
       var node = {
-        x: source.x0,
-        y: source.y0
+        x: source.x,
+        y: source.y
       };
       return this.diagonal({source: node, target: node});
     }).remove();
