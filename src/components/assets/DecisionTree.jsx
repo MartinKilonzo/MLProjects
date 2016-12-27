@@ -15,6 +15,7 @@ class DecisionTreeComponent extends React.Component {
     };
   }
   componentDidMount = () => {
+    window.addEventListener('resizeTree', this.resizeTree);
     // Initialize the SVG object
     const thisDomNode = ReactDOM.findDOMNode(this);
     const margin = {
@@ -39,7 +40,6 @@ class DecisionTreeComponent extends React.Component {
       this.state.root.children.forEach(this.collapseDescendents);
       // Update the tree with the initialzied values
       this.updateTree(this.state.root);
-      window.addEventListener('resizeTree', this.resizeTree);
     })
   }
   componentWillUnmount = () => {
