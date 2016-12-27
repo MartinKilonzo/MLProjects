@@ -1,134 +1,188 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
-import Paper from 'material-ui/Paper';
 import d3 from 'd3';
 
-import DecisionNode from './DecisionNode.jsx';
-import Link from './Link.jsx';
-
-import dataFile from 'json!./data.json';
-let i = 0;
 class DecisionTreeComponent extends React.Component {
   constructor(props) {
     super(props);
     this.state = {
-      duration: props.duration, //TODO: Remove from state if not being changed
+      duration: props.duration,
       height: props.height,
       width: props.width,
-      root: dataFile, // TODO: Replace this with XHRreq func
-      tree: d3.layout.tree().size([props.height, props.width])
+      root: props.data,
+      tree: d3.layout.tree().size([props.height, props.width]),
+      nodeIds: 0
     };
   }
-  componentWillMount = () => {
-    this.state.root.x0 = this.state.height /2;
-    this.state.root.y0 = 0;
-    this.updateTree();
-    // const margin = {
-    //   top: 20,
-    //   right: 40,
-    //   bottom: 20,
-    //   left: 40
-    // };
-    // const height = this.state.height - margin.top - margin.bottom;
-    // const width = this.state.width - margin.right - margin.left;
-    // let tree = d3.layout.tree().size([this.state.height, this.state.width]);
-    // this.setState({tree: tree}, this.updateTree);
-
-  }
   componentDidMount = () => {
-    d3.select(ReactDOM.findDOMNode(this)).attr('width', this.state.width).attr('height', this.state.height)
-
-    var zoom = d3.behavior.zoom().scaleExtent([1, 10]).on('zoom', () => {
-      d3.select(this.refs.container).attr('transform', 'translate(' + d3.event.translate + ')scale(' + d3.event.scale + ')');
-    })
-    d3.select(this.refs.container).call(zoom)
-  }
-  updateTree = () => {
-    let nodes = this.state.tree.nodes(this.state.root);
-    // Spread out nodes evently.
-    let maxDepth = -1;
-    nodes.forEach(node => {
-      if (node.depth > maxDepth - 1) maxDepth = node.depth + 1;
-    })
-    nodes.forEach(node => {
-      node.y = node.depth * (this.state.width / maxDepth);
-    });
-    nodes.forEach(node => {
-      node.source = node.source || this.state.root;
-    })
-    let links = this.state.tree.links(nodes);
-    // console.log(this.state);
-
-
-    this.setState({nodes: nodes, links: links}, () => {
-      // console.log(this.state);
-    });
-  }
-  toggleCollapse = node => {
-    console.log('Toggle', node)
-    console.log(node.children || node._children)
-    if (node.children) {
-      this.setSource(node, node)
-      // Collapse all children, and their children
-      node._children = node.children;
-      // node.children.forEach(this.toggleCollapse); //TODO: create sub-function to toggle collapse of children
-      node.children = null;
-    } else {
-      node.children = node._children;
-      node._children = null;
-    }
-    this.updateTree();
-  }
-  setSource = (node, source) => {
-    if (node.children)
-      node.children.forEach(n => this.setSource(n, source));
-    node.source = source;
-  }
-  render() {
+    // Initialize the SVG object
+    const thisDomNode = ReactDOM.findDOMNode(this);
     const margin = {
       top: 20,
       right: 40,
       bottom: 20,
       left: 40
     };
-    const height = this.state.height - margin.top - margin.bottom;
-    const width = this.state.width - margin.right - margin.left;
-    const styles = {
-      wrapper: {
-        margin: '5% 10% 5% 10%',
-        overflowX: 'hidden'
-      },
-      tree: {
-        margin: `${margin.top} ${margin.right} ${margin.bottom} ${margin.left}`,
-        height: height,
-        width: width
-      },
-      node: {
-        fill: '#fff',
-        stroke: 'lightsteelblue',
-        strokeWidth: '1.5px',
-        cursor: 'pointer'
-      },
-      link: {
-        fill: 'none',
-        stroke: '#ccc',
-        strokeWidth: '1.5px'
+    const svg = d3.select(thisDomNode).append('svg').attr('width', this.state.width).attr('height', this.state.height).append('g').attr('transform', 'translate(' + margin.left + ',' + margin.top + ')');
+
+    // Initialize the nodes with d3 values
+    this.state.tree.nodes(this.state.root);
+
+    // Save the maxDepth and SVG
+    this.setState({
+      maxDepth: this.getMaxDepth(this.state.root) + 1,
+      svg: svg
+    }, () => {
+      // Initialize the root starting location and collapse each child
+      this.state.root.x0 = this.state.height / 2;
+      this.state.root.y0 = 0;
+      this.state.root.children.forEach(this.collapseDescendents);
+      // Update the tree with the initialzied values
+      this.updateTree(this.state.root);
+      window.addEventListener('resizeTree', this.resizeTree);
+    })
+  }
+  componentWillUnmount = () => {
+    window.removeEventListener('resizeTree', this.resizeTree);
+  }
+  resizeTree = event => {
+    const height = event.detail.height;
+    const width = event.detail.width;
+    const tree = d3.layout.tree().size([height, width]);
+    const svg = d3.select(ReactDOM.findDOMNode(this)).select('svg').attr('width', width).attr('height', height);
+    this.setState({
+      height: height,
+      width: width,
+      tree: tree,
+      // svg: svg
+    }, () => {
+      this.updateTree(this.state.root)
+    });
+  }
+  updateTree = (source) => {
+    let nodes = this.state.tree.nodes(this.state.root).reverse();
+    let links = this.state.tree.links(nodes);
+    this.updateNodes(nodes, source);
+    this.updateLinks(links, source);
+    // Stash the old positions for transition.
+    nodes.forEach(node => {
+      node.x0 = node.x;
+      node.y0 = node.y;
+    });
+  }
+  updateNodes = (nodes, source) => {
+    // Spread out nodes evently
+    nodes.forEach(node => {
+      node.y = node.depth * (this.state.width / this.state.maxDepth);
+    });
+
+    let svgNodes = this.state.svg.selectAll('g.node').data(nodes, node => {
+      return node.id || (node.id = ++this.state.nodeIds);
+    });
+
+    let nodeEnter = svgNodes.enter().append('g').attr('class', 'node').attr('transform', (node) => {
+      return `translate(${source.y0}, ${source.x0})`;
+    }).on('click', this.toggleCollapse);
+
+    nodeEnter.append('circle').attr('r', 1e-6).style('fill', node => {
+      return node._children
+        ? 'lightsteelblue'
+        : '#fff';
+    });
+    nodeEnter.append('text').attr('x', node => {
+      return node.children || node._children
+        ? -10
+        : 10;
+    }).attr('dy', '.35em').attr('text-anchor', node => {
+      return node.children || node._children
+        ? 'end'
+        : 'start';
+    }).text(node => {
+      return node.name;
+    }).style('fill-opacity', 1e-6);
+    let nodeUpdate = svgNodes.transition().duration(this.state.duration).attr('transform', node => {
+      return `translate(${node.y}, ${node.x})`;
+    });
+
+    nodeUpdate.select('circle').attr('r', 4.5).style('fill', node => {
+      return node._children
+        ? 'lightsteelblue'
+        : '#fff';
+    });
+
+    nodeUpdate.select('text').style('fill-opacity', 1);
+
+    // Transition exiting nodes to the parent's new position.
+    let nodeExit = svgNodes.exit().transition().duration(this.state.duration).attr('transform', (node) => {
+      return `translate(${source.y},${source.x})`;
+    }).remove();
+
+    nodeExit.select('circle').attr('r', 1e-6);
+
+    nodeExit.select('text').style('fill-opacity', 1e-6);
+  }
+  updateLinks = (links, source) => {
+    // Update the links…
+    let svgLinks = this.state.svg.selectAll('path.link').data(links, link => {
+      return link.target.id;
+    });
+
+    // Enter any new links at the parent's previous position.
+    svgLinks.enter().insert('path', 'g').attr('class', 'link').attr('d', (link) => {
+      let node = {
+        x: source.x0,
+        y: source.y0
+      };
+      return this.diagonal({source: node, target: node});
+    });
+
+    // Transition links to their new position.
+    svgLinks.transition().duration(this.state.duration).attr('d', this.diagonal);
+
+    // Transition exiting nodes to the parent's new position.
+    svgLinks.exit().transition().duration(this.state.duration).attr('d', (link) => {
+      var node = {
+        x: source.x,
+        y: source.y
+      };
+      return this.diagonal({source: node, target: node});
+    }).remove();
+  }
+  toggleCollapse = source => {
+    if (source.children) {
+      source._children = source.children;
+      source.children = null;
+    } else {
+      source.children = source._children;
+      source._children = null;
+    }
+    this.updateTree(source);
+  }
+  collapseDescendents = node => {
+    if (node.children) {
+      node._children = node.children;
+      node.children.forEach(this.collapseDescendents);
+      node.children = null;
+    }
+  }
+  diagonal = d3.svg.diagonal().projection(node => {
+    return [node.y, node.x];
+  })
+  getMaxDepth = (node) => {
+    if (!node.children) {
+      return node.depth;
+    }
+    let maxDepth = 0;
+    for (var child of node.children) {
+      let m = this.getMaxDepth(child);
+      if (m > maxDepth)
+        maxDepth = m;
       }
-    };
-    console.log(this.state)
+    return maxDepth;
+  }
+  render() {
     return (
-      <Paper style={styles.wrapper}>
-        <svg style={styles.tree}>
-          <g ref="container">
-            {this.state.links.map((link, key) => {
-              return <Link key={key} style={styles.link} link={link} duration={this.props.duration}></Link>
-            })}
-            {this.state.nodes.map((node, key) => {
-              return <DecisionNode key={key} node={node} height={this.state.height} duration={this.props.duration} onCollapse={this.toggleCollapse}></DecisionNode>
-            })}
-          </g>
-        </svg>
-      </Paper>
+      <div></div>
     );
   }
 }
