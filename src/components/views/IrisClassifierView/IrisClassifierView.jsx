@@ -8,15 +8,34 @@ import dataFile from 'json!./data.json';
 class IrisClassifierView extends React.Component {
   constructor(props) {
     super(props);
-    this.state = {};
+    this.state = {
+      data: this.toJSONTree(dataFile)
+    };
   }
-  componentWillMount = () => {}
   componentDidMount = () => {
     window.addEventListener('resize', this.updateWidth);
     this.updateWidth();
   }
   componentWillUnmount = () => {
     window.removeEventListener('resize', this.updateWidth);
+  }
+  toJSONTree = x => {
+    var result = {};
+    result.name = x.rule;
+
+    if ((!!x.left && !x.left.value) || (!!x.right && !x.right.value))
+      result.children = [];
+    else
+      result.size = parseInt(x.samples);
+
+    var index = 0;
+    if (!!x.left && !x.left.value)
+      result.children[index++] = this.toJSONTree(x.left);
+
+    if (!!x.right && !x.right.value)
+      result.children[index++] = this.toJSONTree(x.right);
+
+    return result;
   }
   updateWidth = () => {
     const DOMNode = ReactDOM.findDOMNode(this);
@@ -40,7 +59,7 @@ class IrisClassifierView extends React.Component {
     };
     return (
       <Paper style={styles.wrapper}>
-        <DecisionTree {...this.props} width={this.state.width} data={dataFile}></DecisionTree>
+        <DecisionTree {...this.props} width={this.state.width} data={this.state.data}></DecisionTree>
       </Paper>
     );
   }
